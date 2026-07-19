@@ -1,0 +1,65 @@
+/* mcpconsole: Material-dark theme in the spirit of Google's ADK dev UI. */
+
+:root {
+  color-scheme: dark;
+  --bg: #131314;
+  --surface: #1e1f20;
+  --surface-2: #282a2c;
+  --surface-3: #333537;
+  --border: #444746;
+  --hairline: #2d2f31;
+  --text: #e3e3e3;
+  --text-dim: #9aa0a6;
+  --accent: #8ab4f8;
+  --accent-strong: #a8c7fa;
+  --on-accent: #062e6f;
+  --error: #f28b82;
+  --ok: #81c995;
+  --warn: #fdd663;
+  --purple: #c58af9;
+  --radius: 16px;
+  --radius-sm: 10px;
+  --font: "Google Sans Text", "Google Sans", Roboto, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --mono: "Roboto Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 1px 6px 1px rgba(0, 0, 0, 0.18);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.5 var(--font);
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+::selection {
+  background: rgba(138, 180, 248, 0.28);
+}
+
