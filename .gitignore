@@ -1,0 +1,9 @@
+# Binaries
+/adder
+/echo
+*.exe
+
+# Test artifacts
+*.test
+*.out
+coverage.html
