@@ -111,6 +111,10 @@ export class McpClient {
     return tools;
   }
 
+  callTool(name, args) {
+    return this.#rpc("tools/call", { name, arguments: args });
+  }
+
   #headers(extra = {}) {
     const h = {
       Accept: "application/json, text/event-stream",
@@ -246,6 +250,19 @@ export class McpClient {
   }
 
   #dispatch(msg) {
+    if (msg.method && msg.id !== undefined && msg.id !== null) {
+      // Decline (we declared no capabilities!)
+      fetch(this.endpoint, {
+        method: "POST",
+        headers: this.#headers(),
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: msg.id,
+          error: { code: -32601, message: "mcpconsole declares no client capabilities" },
+        }),
+      }).catch(() => {});
+      return;
+    }
     if (msg.method) this.onNotification?.(msg);
   }
 }
