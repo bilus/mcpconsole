@@ -377,6 +377,110 @@ button {
   padding: 22px 30px;
 }
 
+#tool-form {
+  margin-top: 14px;
+}
+
+.object-fields {
+  display: grid;
+  gap: 16px;
+}
+
+.field {
+  min-width: 0;
+}
+
+.filled {
+  position: relative;
+}
+
+.filled input,
+.filled select,
+.filled textarea {
+  width: 100%;
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid transparent;
+  border-bottom: 1px solid var(--border);
+  border-radius: var(--radius-sm) var(--radius-sm) 2px 2px;
+  padding: 21px 14px 7px;
+  font: inherit;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.filled textarea {
+  resize: vertical;
+  min-height: 92px;
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+.filled input:hover,
+.filled select:hover,
+.filled textarea:hover {
+  background: var(--surface-3);
+}
+
+.filled input:focus,
+.filled select:focus,
+.filled textarea:focus {
+  outline: none;
+  border-bottom: 2px solid var(--accent);
+  padding-bottom: 6px;
+}
+
+.filled label {
+  position: absolute;
+  left: 14px;
+  top: 14px;
+  font-size: 14px;
+  color: var(--text-dim);
+  pointer-events: none;
+  transition: all 0.12s ease;
+  max-width: calc(100% - 28px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.filled input:focus + label,
+.filled input:not(:placeholder-shown) + label,
+.filled textarea:focus + label,
+.filled textarea:not(:placeholder-shown) + label,
+.filled.has-value label {
+  top: 5px;
+  font-size: 11px;
+  color: var(--accent);
+}
+
+.filled input:not(:focus):not(:placeholder-shown) + label,
+.filled textarea:not(:focus):not(:placeholder-shown) + label,
+.filled.has-value select:not(:focus) ~ label {
+  color: var(--text-dim);
+}
+
+.field-desc {
+  margin: 5px 2px 0;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.field-error {
+  margin: 5px 2px 0;
+  font-size: 12px;
+  color: var(--error);
+}
+
+.field.invalid .filled input,
+.field.invalid .filled select,
+.field.invalid .filled textarea {
+  border-bottom-color: var(--error);
+}
+
+.field.invalid .filled label {
+  color: var(--error);
+}
+
 }
 
 .no-args {

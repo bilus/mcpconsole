@@ -1,6 +1,16 @@
 import { app, h, text } from "./hyperapp.js";
 import { McpClient, McpError, HttpError } from "./mcp.js";
-import { isEmptyObjectSchema, isSchemaObject, jsonSeed, tokenizeJson } from "./schema.js";
+import {
+  collect,
+  controlsFromJson,
+  initialControls,
+  isEmptyObjectSchema,
+  isRenderable,
+  isSchemaObject,
+  jsonSeed,
+  tokenizeJson,
+} from "./schema.js";
+import { toolForm } from "./form.js";
 
 const BASE_URI = document.baseURI;
 
@@ -28,14 +38,20 @@ const initialState = {
   nextResultId: 1,
 };
 
-// Derive the form state for a tool's input schema. Every tool with arguments
-// is edited as raw JSON, pre-filled with a schema-derived skeleton.
+// Derive the form state for a tool's input schema.
 function buildForm(schema) {
+  const empty = isEmptyObjectSchema(schema);
+  const renderable = !empty && isRenderable(schema);
   return {
     schema,
-    empty: isEmptyObjectSchema(schema),
+    empty,
+    renderable,
+    forcedJson: !empty && !renderable,
+    jsonMode: !empty && !renderable,
     jsonText: JSON.stringify(jsonSeed(schema), null, 2),
     jsonError: null,
+    controls: empty || !renderable ? {} : initialControls(schema),
+    errors: {},
     formMsg: null,
   };
 }
@@ -87,16 +103,53 @@ const SelectTool = (state, tool) => ({
   form: buildForm(tool.inputSchema),
 });
 
+const ToggleJsonMode = (state, on) => {
+  const form = state.form;
+  if (!form) return state;
+  on = Boolean(on) || form.forcedJson;
+  if (on === form.jsonMode) return { ...state, form: { ...form, formMsg: null } };
+  if (on) {
+    const r = form.renderable ? collect(form.schema, form.controls) : { any: false };
+    const seed = r.any ? r.args : jsonSeed(form.schema);
+    return {
+      ...state,
+      form: {
+        ...form,
+        jsonMode: true,
+        jsonText: JSON.stringify(seed, null, 2),
+        jsonError: null,
+        errors: {},
+        formMsg: null,
+      },
+    };
+  }
+    // Note: Best effort.
+  let controls = form.controls;
+  try {
+    const parsed = JSON.parse(form.jsonText);
+    if (isSchemaObject(parsed) && form.renderable) {
+      controls = controlsFromJson(form.schema, form.controls, parsed);
+    }
+  } catch {
+  }
+  return { ...state, form: { ...form, jsonMode: false, controls, jsonError: null, formMsg: null } };
+};
+
 const SetJsonText = (state, jsonText) =>
   state.form ? { ...state, form: { ...state.form, jsonText, jsonError: null } } : state;
+
+const patchControl = (state, path, control) =>
+  state.form
+    ? { ...state, form: { ...state.form, controls: { ...state.form.controls, [path]: control } } }
+    : state;
+
+const SetText = (state, { path, value }) => patchControl(state, path, value);
 
 const Run = (state) => {
   const form = state.form;
   if (!form || !state.selected || state.running) return state;
   let args;
-  if (form.empty) {
-    args = {};
-  } else {
+  if (form.jsonMode) {
     let parsed;
     try {
       parsed = JSON.parse(form.jsonText.trim() === "" ? "{}" : form.jsonText);
@@ -113,9 +166,27 @@ const Run = (state) => {
       };
     }
     args = parsed;
+  } else if (form.empty || !form.renderable) {
+    args = {};
+  } else {
+    const r = collect(form.schema, form.controls);
+    if (r.count > 0) {
+      return [
+        {
+          ...state,
+          form: {
+            ...form,
+            errors: r.errors,
+            formMsg: r.count === 1 ? "1 field needs attention" : `${r.count} fields need attention`,
+          },
+        },
+        scrollToInvalidFx,
+      ];
+    }
+    args = r.args;
   }
   return [
-    { ...state, running: true, form: { ...form, jsonError: null, formMsg: null } },
+    { ...state, running: true, form: { ...form, errors: {}, jsonError: null, formMsg: null } },
     [callToolFx, { name: state.selected.name, args }],
   ];
 };
@@ -189,6 +260,14 @@ const callToolFx = (dispatch, { name, args }) => {
     .callTool(name, args)
     .then(({ result, raw }) => dispatch(CallOk, { result, raw, ...done() }))
     .catch((error) => dispatch(CallFailed, { error, ...done() }));
+};
+
+// Note: Runs after the re-render triggered by the same dispatch (hyperapp queues
+// its render on the animation frame before effects get to ours).
+const scrollToInvalidFx = () => {
+  requestAnimationFrame(() => {
+    document.querySelector(".field.invalid")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  });
 };
 
 const statusChip = ({ status, onretry }) => {
@@ -417,6 +496,8 @@ const resultCard = ({ res }) => {
   ]);
 };
 
+const formHandlers = { SetText, SetJsonText };
+
 const toolPanel = ({ selected, form, running, results }) =>
   h(
     "section",
@@ -431,9 +512,20 @@ const toolPanel = ({ selected, form, running, results }) =>
               ]),
               h(
                 "label",
-                { class: "json-toggle", title: "Arguments are edited as raw JSON." },
+                {
+                  class: ["json-toggle", { forced: form.forcedJson }],
+                  title: form.forcedJson
+                    ? "This schema uses constructs the form renderer doesn't cover; edit the arguments as JSON."
+                    : "",
+                },
                 [
-                  h("input", { type: "checkbox", id: "json-mode", checked: !form.empty, disabled: true }),
+                  h("input", {
+                    type: "checkbox",
+                    id: "json-mode",
+                    checked: form.jsonMode,
+                    disabled: form.forcedJson,
+                    onchange: (_, event) => [ToggleJsonMode, event.target.checked],
+                  }),
                   text(" "),
                   h("span", {}, text("Edit as JSON")),
                 ],
@@ -446,25 +538,7 @@ const toolPanel = ({ selected, form, running, results }) =>
                 novalidate: true,
                 onsubmit: (state, event) => (event.preventDefault(), Run),
               },
-              [
-                h("div", { class: "form-fields", hidden: !form.empty }, [
-                  form.empty ? h("p", { class: "no-args" }, text("This tool takes no arguments.")) : false,
-                ]),
-                h("div", { class: "json-editor", hidden: form.empty }, [
-                  h("textarea", {
-                    class: "json-textarea",
-                    spellcheck: false,
-                    "aria-label": "Tool arguments as JSON",
-                    value: form.jsonText,
-                    oninput: (_, event) => [SetJsonText, event.target.value],
-                  }),
-                  h(
-                    "div",
-                    { class: "field-error json-parse-error", hidden: !form.jsonError },
-                    form.jsonError ? text(form.jsonError) : [],
-                  ),
-                ]),
-              ],
+              toolForm({ form, handlers: formHandlers }),
             ),
             h("div", { id: "form-actions" }, [
               h(
