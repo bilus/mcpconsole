@@ -459,6 +459,11 @@ button {
   color: var(--text-dim);
 }
 
+/* number spinners: keep native but subtle */
+.filled input[type="number"] {
+  appearance: textfield;
+}
+
 .field-desc {
   margin: 5px 2px 0;
   font-size: 12px;

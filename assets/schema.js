@@ -39,6 +39,8 @@ export function isRenderable(schema, depth = 0) {
       return Object.values(props).every((p) => isRenderable(p, depth + 1));
     }
     case "string":
+    case "number":
+    case "integer":
       return true;
     default:
       return false;
@@ -84,6 +86,9 @@ export function fieldKind(prop) {
   switch (prop.type) {
     case "object":
       return "object";
+    case "number":
+    case "integer":
+      return "number";
     default:
       return "string";
   }
@@ -105,6 +110,8 @@ let nextRowId = 0; // row identity for keyed rendering
 
 function controlForValue(prop, value) {
   switch (fieldKind(prop)) {
+    case "number":
+      return typeof value === "number" ? { text: String(value), badInput: false } : initialControl(prop, false);
     case "string":
       return typeof value === "string" ? value : initialControl(prop, false);
     default:
@@ -114,6 +121,8 @@ function controlForValue(prop, value) {
 
 function initialControl(prop, required) {
   switch (fieldKind(prop)) {
+    case "number":
+      return { text: typeof prop.default === "number" ? String(prop.default) : "", badInput: false };
     case "string":
       return typeof prop.default === "string" ? prop.default : "";
     default:
@@ -155,6 +164,21 @@ function collectLeaf(prop, required, control, errors, path) {
     return { present: false };
   };
   switch (fieldKind(prop)) {
+    case "number": {
+      const { text, badInput } = control || { text: "", badInput: false };
+      if (badInput) return fail("Not a valid number");
+      const v = String(text).trim();
+      if (v === "") {
+        if (required) return fail("Required");
+        return { present: false };
+      }
+      const n = Number(v);
+      if (!Number.isFinite(n)) return fail("Not a valid number");
+      if (prop.type === "integer" && !Number.isInteger(n)) return fail("Must be an integer");
+      if (prop.minimum !== undefined && n < prop.minimum) return fail(`Must be ≥ ${prop.minimum}`);
+      if (prop.maximum !== undefined && n > prop.maximum) return fail(`Must be ≤ ${prop.maximum}`);
+      return { present: true, value: n };
+    }
     default: {
       const v = typeof control === "string" ? control : "";
       if (v === "") {

@@ -144,6 +144,33 @@ const patchControl = (state, path, control) =>
     : state;
 
 const SetText = (state, { path, value }) => patchControl(state, path, value);
+const SetNumber = (state, { path, text: t, badInput }) => patchControl(state, path, { text: t, badInput });
+
+const RunRequested = (state) =>
+  state.form && state.selected && !state.running ? [state, captureNumberValidityFx] : state;
+
+// mergeNumberCapture routes a captured {path, text, badInput} to its control:
+// either a direct entry, or a row control inside an array (path "<array>.<id>").
+function mergeNumberCapture(controls, { path, text: t, badInput }) {
+  if (path in controls) return { ...controls, [path]: { text: t, badInput } };
+  const i = path.lastIndexOf(".");
+  if (i < 0) return controls;
+  const parent = path.slice(0, i);
+  const id = Number(path.slice(i + 1));
+  const rows = controls[parent];
+  if (!Array.isArray(rows)) return controls;
+  return {
+    ...controls,
+    [parent]: rows.map((row) => (row.id === id ? { ...row, control: { text: t, badInput } } : row)),
+  };
+}
+
+const RunWithCapturedValidity = (state, captured) => {
+  if (!state.form) return state;
+  let controls = state.form.controls;
+  for (const c of captured) controls = mergeNumberCapture(controls, c);
+  return Run({ ...state, form: { ...state.form, controls } });
+};
 
 const Run = (state) => {
   const form = state.form;
@@ -260,6 +287,15 @@ const callToolFx = (dispatch, { name, args }) => {
     .callTool(name, args)
     .then(({ result, raw }) => dispatch(CallOk, { result, raw, ...done() }))
     .catch((error) => dispatch(CallFailed, { error, ...done() }));
+};
+
+const captureNumberValidityFx = (dispatch) => {
+  const captured = Array.from(document.querySelectorAll('#tool-form input[type="number"][data-path]')).map((el) => ({
+    path: el.dataset.path,
+    text: el.value,
+    badInput: Boolean(el.validity && el.validity.badInput),
+  }));
+  dispatch(RunWithCapturedValidity, captured);
 };
 
 // Note: Runs after the re-render triggered by the same dispatch (hyperapp queues
@@ -496,7 +532,7 @@ const resultCard = ({ res }) => {
   ]);
 };
 
-const formHandlers = { SetText, SetJsonText };
+const formHandlers = { SetText, SetNumber, SetJsonText };
 
 const toolPanel = ({ selected, form, running, results }) =>
   h(
@@ -536,7 +572,7 @@ const toolPanel = ({ selected, form, running, results }) =>
               {
                 id: "tool-form",
                 novalidate: true,
-                onsubmit: (state, event) => (event.preventDefault(), Run),
+                onsubmit: (state, event) => (event.preventDefault(), RunRequested),
               },
               toolForm({ form, handlers: formHandlers }),
             ),
@@ -548,7 +584,7 @@ const toolPanel = ({ selected, form, running, results }) =>
                   type: "button",
                   class: ["primary", { busy: running }],
                   disabled: running,
-                  onclick: Run,
+                  onclick: RunRequested,
                 },
                 text("Run tool"),
               ),

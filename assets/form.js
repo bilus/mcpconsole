@@ -43,8 +43,50 @@ function textField({ path, name, prop, required, value, error, desc, oninput }) 
   });
 }
 
+function numberField({ path, name, prop, required, control, error, desc, oninput }) {
+  const id = controlId(path);
+  return fieldShell({
+    path,
+    invalid: error,
+    desc,
+    error,
+    children: [
+      h("div", { class: "filled" }, [
+        h("input", {
+          id,
+          type: "number",
+          placeholder: " ",
+          step: prop.type === "integer" ? "1" : "any",
+          min: prop.minimum !== undefined ? String(prop.minimum) : undefined,
+          max: prop.maximum !== undefined ? String(prop.maximum) : undefined,
+          value: control ? control.text : "",
+          // Lets the run action re-capture live validity (some engines fire
+          // the input event before validity.badInput is up to date).
+          "data-path": path,
+          oninput,
+        }),
+        h("label", { for: id }, text(labelText(name, required))),
+      ]),
+    ],
+  });
+}
+
 function leafField({ path, name, prop, required, control, error, desc, handlers }) {
   switch (fieldKind(prop)) {
+    case "number":
+      return numberField({
+        path,
+        name,
+        prop,
+        required,
+        control,
+        error,
+        desc,
+        oninput: (_, event) => [
+          handlers.SetNumber,
+          { path, text: event.target.value, badInput: Boolean(event.target.validity && event.target.validity.badInput) },
+        ],
+      });
     default:
       return textField({
         path,
