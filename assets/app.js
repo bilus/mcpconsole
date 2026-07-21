@@ -1,6 +1,8 @@
 import { app, h, text } from "./hyperapp.js";
 import { McpClient, McpError, HttpError } from "./mcp.js";
-import { isEmptyObjectSchema, isSchemaObject, jsonSeed } from "./schema.js";
+import { isEmptyObjectSchema, isSchemaObject, jsonSeed, tokenizeJson } from "./schema.js";
+
+const BASE_URI = document.baseURI;
 
 function readConfig() {
   try {
@@ -280,6 +282,92 @@ const rail = ({ title, server, status, tools, connectError, toolsSpinning, selec
     toolList({ tools, connectError, selectedName }),
   ]);
 
+const jsonView = ({ value }) =>
+  h(
+    "pre",
+    { class: "json-block" },
+    tokenizeJson(value).map((t) => (t.cls ? h("span", { class: t.cls }, text(t.text)) : text(t.text))),
+  );
+
+const blockLabel = (label) => h("div", { class: "block-label" }, text(label));
+
+const rawBlock = ({ block, label }) => h("div", {}, [blockLabel(label), jsonView({ value: block })]);
+
+// A clickable URL only for http(s) targets.
+function safeHref(uri) {
+  try {
+    const u = new URL(uri, BASE_URI);
+    if (u.protocol === "http:" || u.protocol === "https:") return u.href;
+  } catch {
+    // unparseable => unsafe
+  }
+  return null;
+}
+
+const contentView = ({ block }) => {
+  switch (block?.type) {
+    case "text":
+      return h("pre", { class: "text-block" }, text(block.text ?? ""));
+    case "image": {
+      if (typeof block.data !== "string" || block.data === "") {
+        return rawBlock({ block, label: "content (image, no data)" });
+      }
+      return h("img", {
+        class: "image-block",
+        src: `data:${block.mimeType || "image/png"};base64,${block.data}`,
+        alt: block.mimeType || "image content",
+      });
+    }
+    case "audio": {
+      if (typeof block.data !== "string" || block.data === "") {
+        return rawBlock({ block, label: "content (audio, no data)" });
+      }
+      return h("audio", {
+        class: "audio-block",
+        controls: true,
+        src: `data:${block.mimeType || "audio/wav"};base64,${block.data}`,
+      });
+    }
+    case "resource_link": {
+      const href = safeHref(block.uri);
+      const label = block.title || block.name || String(block.uri);
+      return h("div", { class: "resource-link" }, [
+        href
+          ? h("a", { href, target: "_blank", rel: "noopener noreferrer" }, text(label))
+          : h("span", { class: "resource-link-inert" }, text(label)),
+        h("div", { class: "field-desc" }, text(block.description || String(block.uri))),
+      ]);
+    }
+    case "resource": {
+      const r = block.resource || {};
+      return h("div", { class: "embedded-resource" }, [
+        blockLabel(`resource ${r.uri || ""}`),
+        typeof r.text === "string"
+          ? h("pre", { class: "text-block" }, text(r.text))
+          : typeof r.blob === "string" && (r.mimeType || "").startsWith("image/")
+            ? h("img", { class: "image-block", src: `data:${r.mimeType};base64,${r.blob}`, alt: r.uri || "resource image" })
+            : jsonView({ value: r }),
+      ]);
+    }
+    default:
+      return rawBlock({ block, label: `content (${block?.type ?? "unknown"})` });
+  }
+};
+
+const rawPanel = ({ raw }) =>
+  h("details", { class: "raw" }, [
+    h("summary", {}, text("Raw request · response")),
+    h("div", { class: "raw-grid" }, [
+      h("div", {}, [blockLabel("request"), jsonView({ value: raw.request })]),
+      h("div", {}, [
+        blockLabel(
+          raw.transport ? `response (${raw.transport}, HTTP ${raw.httpStatus})` : `response (HTTP ${raw.httpStatus})`,
+        ),
+        jsonView({ value: raw.response }),
+      ]),
+    ]),
+  ]);
+
 const resultHead = ({ res, badge, badgeClass }) =>
   h("header", { class: "result-head" }, [
     h("span", { class: "result-tool" }, text(res.tool)),
@@ -301,21 +389,31 @@ const resultCard = ({ res }) => {
       resultHead({ res, badge: "Error", badgeClass: "badge-err" }),
       h("div", { class: "result-body" }, [
         h("pre", { class: "text-block error-text" }, text(errorText(res.error))),
+        res.error instanceof McpError && res.error.data !== undefined
+          ? h("div", {}, [blockLabel("error.data"), jsonView({ value: res.error.data })])
+          : false,
       ]),
+      res.raw ? rawPanel({ raw: res.raw }) : false,
     ]);
   }
   const isErr = res.kind === "toolerr";
   const result = res.result || {};
-  const blocks = (result.content ?? []).filter((b) => b?.type === "text");
+  const blocks = result.content ?? [];
+  const hasStructured = "structuredContent" in result && result.structuredContent !== undefined;
   return h("article", { key: res.id, class: ["result-card", { "is-error": isErr }] }, [
     resultHead({ res, badge: isErr ? "Tool error" : "OK", badgeClass: isErr ? "badge-err" : "badge-ok" }),
     h(
       "div",
       { class: "result-body" },
-      blocks.length
-        ? blocks.map((b) => h("pre", { class: "text-block" }, text(b.text ?? "")))
+      blocks.length || hasStructured
+        ? [
+            ...blocks.map((block) => contentView({ block })),
+            hasStructured ? blockLabel("structuredContent") : false,
+            hasStructured ? jsonView({ value: result.structuredContent }) : false,
+          ]
         : [h("div", { class: "text-dim" }, text("(empty result)"))],
     ),
+    res.raw ? rawPanel({ raw: res.raw }) : false,
   ]);
 };
 
