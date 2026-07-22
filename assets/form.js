@@ -1,5 +1,5 @@
 import { h, text } from "./hyperapp.js";
-import { fieldKind, stringInputSpec } from "./schema.js";
+import { enumOptions, fieldKind, selectHasDefault, stringInputSpec } from "./schema.js";
 
 function labelText(name, required) {
   return required ? `${name} *` : name;
@@ -89,8 +89,40 @@ function switchField({ path, name, required, checked, desc, ontoggle }) {
   });
 }
 
+function selectField({ path, name, prop, required, value, error, desc, onchange }) {
+  const id = controlId(path);
+  const values = enumOptions(prop);
+  const withEmpty = !required && !selectHasDefault(prop);
+  return fieldShell({
+    path,
+    invalid: error,
+    desc,
+    error,
+    children: [
+      h("div", { class: "filled has-value" }, [
+        h("select", { id, value, onchange }, [
+          withEmpty ? h("option", { value: "" }, text("-")) : false,
+          ...values.map((v, i) => h("option", { value: String(i) }, text(v === null ? "null" : String(v)))),
+        ]),
+        h("label", { for: id }, text(labelText(name, required))),
+      ]),
+    ],
+  });
+}
+
 function leafField({ path, name, prop, required, control, error, desc, handlers }) {
   switch (fieldKind(prop)) {
+    case "select":
+      return selectField({
+        path,
+        name,
+        prop,
+        required,
+        value: typeof control === "string" ? control : "",
+        error,
+        desc,
+        onchange: (_, event) => [handlers.SetSelect, { path, value: event.target.value }],
+      });
     case "switch":
       return switchField({
         path,

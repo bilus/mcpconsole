@@ -11,6 +11,10 @@ export function isSchemaObject(s) {
   return s != null && typeof s === "object" && !Array.isArray(s);
 }
 
+function isScalar(v) {
+  return v === null || ["string", "number", "boolean"].includes(typeof v);
+}
+
 // Recognize "this tool takes no arguments" schemas: absent schema, or a plain
 // object schema without properties.
 export function isEmptyObjectSchema(s) {
@@ -28,6 +32,10 @@ export function isRenderable(schema, depth = 0) {
   if (!isSchemaObject(schema)) return false;
   if (depth > MAX_DEPTH) return false;
   if (UNSUPPORTED_KEYWORDS.some((k) => k in schema)) return false;
+  if (schema.enum !== undefined) {
+    return Array.isArray(schema.enum) && schema.enum.length > 0 && schema.enum.every(isScalar);
+  }
+  if (schema.const !== undefined) return isScalar(schema.const);
   const type = schema.type;
   if (type === undefined || Array.isArray(type)) return false;
   switch (type) {
@@ -83,7 +91,13 @@ export function jsonSeed(schema) {
   return isSchemaObject(seed) ? seed : {};
 }
 
+export function enumOptions(prop) {
+  if (prop.const !== undefined) return [prop.const];
+  return prop.enum;
+}
+
 export function fieldKind(prop) {
+  if (prop.enum !== undefined || prop.const !== undefined) return "select";
   switch (prop.type) {
     case "boolean":
       return "switch";
@@ -109,10 +123,19 @@ export function stringInputSpec(prop) {
   return { multiline, type };
 }
 
+export function selectHasDefault(prop) {
+  const values = enumOptions(prop);
+  return prop.default !== undefined && values.some((v) => v === prop.default);
+}
+
 let nextRowId = 0; // row identity for keyed rendering
 
 function controlForValue(prop, value) {
   switch (fieldKind(prop)) {
+    case "select": {
+      const i = enumOptions(prop).findIndex((v) => v === value);
+      return i >= 0 ? String(i) : initialControl(prop, false);
+    }
     case "switch":
       return typeof value === "boolean" ? value : initialControl(prop, false);
     case "number":
@@ -126,6 +149,15 @@ function controlForValue(prop, value) {
 
 function initialControl(prop, required) {
   switch (fieldKind(prop)) {
+    case "select": {
+      if (selectHasDefault(prop)) {
+        return String(enumOptions(prop).findIndex((v) => v === prop.default));
+      }
+      // A required select renders without an empty option, so the browser
+      // shows the first choice; mirror that in state. Optional selects get
+      // the empty placeholder option, i.e. nothing chosen.
+      return required ? "0" : "";
+    }
     case "switch":
       return prop.default === true;
     case "number":
@@ -171,6 +203,16 @@ function collectLeaf(prop, required, control, errors, path) {
     return { present: false };
   };
   switch (fieldKind(prop)) {
+    case "select": {
+      // NOTE: Required selects start at index "0" (see initialControl), so an
+      // empty control here can only mean an optional field left unchosen, or an
+      // unexpected gap, which required-ness turns into an error.
+      if (control === "" || control === undefined) {
+        if (required) return fail("Required");
+        return { present: false };
+      }
+      return { present: true, value: enumOptions(prop)[Number(control)] };
+    }
     case "switch":
       return { present: true, value: control === true };
     case "number": {

@@ -459,6 +459,22 @@ button {
   color: var(--text-dim);
 }
 
+.filled select {
+  appearance: none;
+  cursor: pointer;
+}
+
+.filled:has(select)::after {
+  content: "";
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  margin-top: -2px;
+  border: 5px solid transparent;
+  border-top-color: var(--text-dim);
+  pointer-events: none;
+}
+
 /* number spinners: keep native but subtle */
 .filled input[type="number"] {
   appearance: textfield;

@@ -146,6 +146,7 @@ const patchControl = (state, path, control) =>
 const SetText = (state, { path, value }) => patchControl(state, path, value);
 const SetNumber = (state, { path, text: t, badInput }) => patchControl(state, path, { text: t, badInput });
 const SetToggle = (state, { path, checked }) => patchControl(state, path, checked);
+const SetSelect = (state, { path, value }) => patchControl(state, path, value);
 
 const RunRequested = (state) =>
   state.form && state.selected && !state.running ? [state, captureNumberValidityFx] : state;
@@ -533,7 +534,7 @@ const resultCard = ({ res }) => {
   ]);
 };
 
-const formHandlers = { SetText, SetNumber, SetToggle, SetJsonText };
+const formHandlers = { SetText, SetNumber, SetToggle, SetSelect, SetJsonText };
 
 const toolPanel = ({ selected, form, running, results }) =>
   h(
