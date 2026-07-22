@@ -76,6 +76,8 @@ async function* sseEvents(body) {
 
 export class McpClient {
   #nextId = 0;
+  #streamCtrl = null;
+  #reinitPromise = null;
 
   constructor({ endpoint, onNotification, onStatus } = {}) {
     this.endpoint = new URL(endpoint, document.baseURI).toString();
@@ -92,12 +94,18 @@ export class McpClient {
     try {
       const result = await this.#initialize();
       await this.#notify("notifications/initialized");
+      this.#startStream();
       this.onStatus?.("connected");
       return result;
     } catch (err) {
       this.onStatus?.("error", String(err.message || err));
       throw err;
     }
+  }
+
+  close() {
+    this.#streamCtrl?.abort();
+    this.#streamCtrl = null;
   }
 
   async listTools() {
@@ -127,6 +135,7 @@ export class McpClient {
   }
 
   async #initialize() {
+    this.close();
     this.sessionId = null;
     this.protocolVersion = null;
     const id = ++this.#nextId;
@@ -173,7 +182,26 @@ export class McpClient {
     await safeText(res); // drain the (empty) body so the browser closes cleanly
   }
 
-  async #rpc(method, params) {
+  #reinitialize() {
+    if (!this.#reinitPromise) {
+      this.#reinitPromise = (async () => {
+        try {
+          await this.#initialize();
+          await this.#notify("notifications/initialized");
+          this.#startStream();
+          this.onStatus?.("connected");
+        } catch (err) {
+          this.onStatus?.("error", String(err.message || err));
+          throw err;
+        } finally {
+          this.#reinitPromise = null;
+        }
+      })();
+    }
+    return this.#reinitPromise;
+  }
+
+  async #rpc(method, params, allowRetry = true) {
     const id = ++this.#nextId;
     const request = { jsonrpc: "2.0", id, method, params };
     const raw = { request, response: null, httpStatus: null, transport: null };
@@ -183,6 +211,12 @@ export class McpClient {
       body: JSON.stringify(request),
     });
     raw.httpStatus = res.status;
+      // Session expired or unknown (the SDK answers 404).
+    if (res.status === 404 && this.sessionId && allowRetry) {
+      await safeText(res); // drain
+      await this.#reinitialize();
+      return this.#rpc(method, params, false);
+    }
     if (!res.ok) {
       const text = await safeText(res);
       const err = new HttpError(res.status, text);
@@ -264,5 +298,36 @@ export class McpClient {
       return;
     }
     if (msg.method) this.onNotification?.(msg);
+  }
+
+  #startStream() {
+    this.close();
+    if (!this.sessionId) return;
+    const ctrl = new AbortController();
+    this.#streamCtrl = ctrl;
+    (async () => {
+      try {
+        const res = await fetch(this.endpoint, {
+          headers: {
+            Accept: "text/event-stream",
+            "Mcp-Session-Id": this.sessionId,
+            "MCP-Protocol-Version": this.protocolVersion || PROTOCOL_VERSION,
+          },
+          signal: ctrl.signal,
+        });
+        if (!res.ok || !res.body) return;
+        for await (const data of sseEvents(res.body)) {
+          let msg;
+          try {
+            msg = JSON.parse(data);
+          } catch {
+            continue;
+          }
+          this.#dispatch(msg);
+        }
+      } catch {
+        // Degrade silently.
+      }
+    })();
   }
 }
