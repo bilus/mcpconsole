@@ -40,7 +40,6 @@ export function isRenderable(schema, depth = 0) {
   if (type === undefined || Array.isArray(type)) return false;
   switch (type) {
     case "object": {
-      if (depth > 0) return false;
       const props = schema.properties;
       if (!isSchemaObject(props) || Object.keys(props).length === 0) return false;
       if (isSchemaObject(schema.additionalProperties)) return false;
@@ -191,6 +190,9 @@ export function initialControls(schema, base = "", out = {}) {
   for (const [name, prop] of Object.entries(schema.properties || {})) {
     const path = base ? `${base}.${name}` : name;
     switch (fieldKind(prop)) {
+      case "object":
+        initialControls(prop, path, out);
+        break;
       case "array":
         out[path] = Array.isArray(prop.default) ? prop.default.map((v) => newRow(prop.items, v)) : [];
         break;
@@ -208,6 +210,9 @@ export function controlsFromJson(schema, prior, json, base = "", out = {}) {
     const path = base ? `${base}.${name}` : name;
     const has = isSchemaObject(json) && json[name] !== undefined;
     switch (fieldKind(prop)) {
+      case "object":
+        controlsFromJson(prop, prior, has ? json[name] : undefined, path, out);
+        break;
       case "array":
         out[path] =
           has && Array.isArray(json[name])
@@ -297,6 +302,16 @@ function collectObject(schema, controls, base, errors) {
     const required = requiredList.includes(name);
     let r;
     switch (fieldKind(prop)) {
+      case "object": {
+        const probe = collectObject(prop, controls, path, {});
+        if (!probe.any && !required) {
+          r = { present: false };
+        } else {
+          const inner = collectObject(prop, controls, path, errors);
+          r = { present: true, value: inner.value };
+        }
+        break;
+      }
       case "array":
         r = collectArray(prop, required, controls[path], errors, path);
         break;

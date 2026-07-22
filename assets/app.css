@@ -580,6 +580,24 @@ button {
   font-size: 13.5px;
 }
 
+/* nested objects */
+
+fieldset.group {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  margin: 0;
+  display: grid;
+  gap: 14px;
+}
+
+fieldset.group > legend {
+  padding: 0 6px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--accent-strong);
+}
+
 /* arrays */
 
 .array-head {
@@ -833,3 +851,44 @@ details.raw summary:hover {
   }
 }
 
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--surface-3);
+  border-radius: 999px;
+  border: 2px solid var(--bg);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border);
+}
+
+@media (max-width: 860px) {
+  #app {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  #rail {
+    border-right: 0;
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  #tool-list {
+    max-height: 260px;
+  }
+
+  #main {
+    overflow: visible;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

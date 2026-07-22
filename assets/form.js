@@ -160,6 +160,15 @@ function arrayField({ path, name, prop, required, rows, errors, desc, handlers }
   });
 }
 
+function objectGroup({ path, name, prop, required, children }) {
+  const desc = typeof prop.description === "string" ? prop.description : "";
+  return h("fieldset", { key: path, class: "field group" }, [
+    h("legend", {}, text(labelText(name, required))),
+    desc ? h("div", { class: "field-desc" }, text(desc)) : false,
+    h("div", { class: "object-fields" }, children),
+  ]);
+}
+
 function leafField({ path, name, prop, required, control, error, desc, handlers }) {
   switch (fieldKind(prop)) {
     case "select":
@@ -217,6 +226,14 @@ function objectFields({ schema, controls, errors, base, handlers }) {
     const required = requiredList.includes(name);
     const desc = typeof prop.description === "string" ? prop.description : "";
     switch (fieldKind(prop)) {
+      case "object":
+        return objectGroup({
+          path,
+          name,
+          prop,
+          required,
+          children: objectFields({ schema: prop, controls, errors, base: path, handlers }),
+        });
       case "array":
         return arrayField({ path, name, prop, required, rows: controls[path], errors, desc, handlers });
       default:
