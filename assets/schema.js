@@ -41,6 +41,7 @@ export function isRenderable(schema, depth = 0) {
     case "string":
     case "number":
     case "integer":
+    case "boolean":
       return true;
     default:
       return false;
@@ -84,6 +85,8 @@ export function jsonSeed(schema) {
 
 export function fieldKind(prop) {
   switch (prop.type) {
+    case "boolean":
+      return "switch";
     case "object":
       return "object";
     case "number":
@@ -110,6 +113,8 @@ let nextRowId = 0; // row identity for keyed rendering
 
 function controlForValue(prop, value) {
   switch (fieldKind(prop)) {
+    case "switch":
+      return typeof value === "boolean" ? value : initialControl(prop, false);
     case "number":
       return typeof value === "number" ? { text: String(value), badInput: false } : initialControl(prop, false);
     case "string":
@@ -121,6 +126,8 @@ function controlForValue(prop, value) {
 
 function initialControl(prop, required) {
   switch (fieldKind(prop)) {
+    case "switch":
+      return prop.default === true;
     case "number":
       return { text: typeof prop.default === "number" ? String(prop.default) : "", badInput: false };
     case "string":
@@ -164,6 +171,8 @@ function collectLeaf(prop, required, control, errors, path) {
     return { present: false };
   };
   switch (fieldKind(prop)) {
+    case "switch":
+      return { present: true, value: control === true };
     case "number": {
       const { text, badInput } = control || { text: "", badInput: false };
       if (badInput) return fail("Not a valid number");

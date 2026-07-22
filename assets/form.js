@@ -71,8 +71,35 @@ function numberField({ path, name, prop, required, control, error, desc, oninput
   });
 }
 
+function switchField({ path, name, required, checked, desc, ontoggle }) {
+  return fieldShell({
+    path,
+    desc,
+    error: null,
+    children: [
+      h("label", { class: "switch-row" }, [
+        h("span", { class: "switch" }, [
+          h("input", { id: controlId(path), type: "checkbox", checked: checked === true, onchange: ontoggle }),
+          h("span", { class: "track" }),
+          h("span", { class: "thumb" }),
+        ]),
+        h("span", { class: "switch-label" }, text(labelText(name, required))),
+      ]),
+    ],
+  });
+}
+
 function leafField({ path, name, prop, required, control, error, desc, handlers }) {
   switch (fieldKind(prop)) {
+    case "switch":
+      return switchField({
+        path,
+        name,
+        required,
+        checked: control === true,
+        desc,
+        ontoggle: (_, event) => [handlers.SetToggle, { path, checked: event.target.checked }],
+      });
     case "number":
       return numberField({
         path,
