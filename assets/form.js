@@ -110,6 +110,56 @@ function selectField({ path, name, prop, required, value, error, desc, onchange 
   });
 }
 
+function arrayRow({ path, name, prop, index, row, error, handlers }) {
+  const item = leafField({
+    path: `${path}.${row.id}`,
+    name: `${name}[${index}]`,
+    prop: prop.items,
+    required: false,
+    control: row.control,
+    error,
+    desc: null,
+    handlers,
+  });
+  return h("div", { key: row.id, class: "array-row" }, [
+    item,
+    h(
+      "button",
+      {
+        type: "button",
+        class: "icon-btn remove-row",
+        title: "Remove item",
+        "aria-label": "Remove item",
+        onclick: [handlers.RemoveRow, { path, id: row.id }],
+      },
+      text("✕"),
+    ),
+  ]);
+}
+
+function arrayField({ path, name, prop, required, rows, errors, desc, handlers }) {
+  return fieldShell({
+    path,
+    extraClass: "array-field",
+    invalid: errors[path],
+    desc,
+    error: errors[path],
+    children: [
+      h("div", { class: "array-head" }, [
+        h("span", { class: "array-label" }, text(labelText(name, required))),
+        h("button", { type: "button", class: "text-btn", onclick: [handlers.AddRow, path] }, text("+ Add")),
+      ]),
+      h(
+        "div",
+        { class: "array-rows" },
+        (rows || []).map((row, index) =>
+          arrayRow({ path, name, prop, index, row, error: errors[`${path}.${row.id}`], handlers }),
+        ),
+      ),
+    ],
+  });
+}
+
 function leafField({ path, name, prop, required, control, error, desc, handlers }) {
   switch (fieldKind(prop)) {
     case "select":
@@ -167,6 +217,8 @@ function objectFields({ schema, controls, errors, base, handlers }) {
     const required = requiredList.includes(name);
     const desc = typeof prop.description === "string" ? prop.description : "";
     switch (fieldKind(prop)) {
+      case "array":
+        return arrayField({ path, name, prop, required, rows: controls[path], errors, desc, handlers });
       default:
         return leafField({ path, name, prop, required, control: controls[path], error: errors[path], desc, handlers });
     }

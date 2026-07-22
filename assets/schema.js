@@ -46,6 +46,12 @@ export function isRenderable(schema, depth = 0) {
       if (isSchemaObject(schema.additionalProperties)) return false;
       return Object.values(props).every((p) => isRenderable(p, depth + 1));
     }
+    case "array": {
+      const items = schema.items;
+      if (!isSchemaObject(items)) return false;
+      if (!isRenderable(items, depth + 1)) return false;
+      return items.enum !== undefined || items.const !== undefined || PRIMITIVES.has(items.type);
+    }
     case "string":
     case "number":
     case "integer":
@@ -103,6 +109,8 @@ export function fieldKind(prop) {
       return "switch";
     case "object":
       return "object";
+    case "array":
+      return "array";
     case "number":
     case "integer":
       return "number";
@@ -169,6 +177,13 @@ function initialControl(prop, required) {
   }
 }
 
+export function newRow(itemsSchema, value) {
+  return {
+    id: ++nextRowId,
+    control: value === undefined ? initialControl(itemsSchema, false) : controlForValue(itemsSchema, value),
+  };
+}
+
 // initialControls builds the control map for a renderable object schema,
 // honoring schema defaults.
 export function initialControls(schema, base = "", out = {}) {
@@ -176,6 +191,9 @@ export function initialControls(schema, base = "", out = {}) {
   for (const [name, prop] of Object.entries(schema.properties || {})) {
     const path = base ? `${base}.${name}` : name;
     switch (fieldKind(prop)) {
+      case "array":
+        out[path] = Array.isArray(prop.default) ? prop.default.map((v) => newRow(prop.items, v)) : [];
+        break;
       default:
         out[path] = initialControl(prop, requiredList.includes(name));
     }
@@ -190,6 +208,12 @@ export function controlsFromJson(schema, prior, json, base = "", out = {}) {
     const path = base ? `${base}.${name}` : name;
     const has = isSchemaObject(json) && json[name] !== undefined;
     switch (fieldKind(prop)) {
+      case "array":
+        out[path] =
+          has && Array.isArray(json[name])
+            ? json[name].map((v) => newRow(prop.items, v))
+            : prior[path] || [];
+        break;
       default:
         out[path] = has ? controlForValue(prop, json[name]) : prior[path] ?? initialControl(prop);
     }
@@ -244,6 +268,26 @@ function collectLeaf(prop, required, control, errors, path) {
   }
 }
 
+function collectArray(prop, required, rows, errors, path) {
+  const values = [];
+  for (const row of rows || []) {
+    const r = collectLeaf(prop.items, false, row.control, errors, `${path}.${row.id}`);
+    if (r.present) values.push(r.value);
+  }
+  // NOTE: An optional array left empty is omitted entirely; constraints like
+  // minItems only apply once the property is actually present.
+  if (values.length === 0 && !required) return { present: false };
+  if (prop.minItems !== undefined && values.length < prop.minItems) {
+    errors[path] = `Needs at least ${prop.minItems} item${prop.minItems === 1 ? "" : "s"}`;
+    return { present: false };
+  }
+  if (prop.maxItems !== undefined && values.length > prop.maxItems) {
+    errors[path] = `At most ${prop.maxItems} item${prop.maxItems === 1 ? "" : "s"}`;
+    return { present: false };
+  }
+  return { present: true, value: values };
+}
+
 function collectObject(schema, controls, base, errors) {
   const out = {};
   let any = false;
@@ -253,6 +297,9 @@ function collectObject(schema, controls, base, errors) {
     const required = requiredList.includes(name);
     let r;
     switch (fieldKind(prop)) {
+      case "array":
+        r = collectArray(prop, required, controls[path], errors, path);
+        break;
       default:
         r = collectLeaf(prop, required, controls[path], errors, path);
     }

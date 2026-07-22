@@ -8,6 +8,7 @@ import {
   isRenderable,
   isSchemaObject,
   jsonSeed,
+  newRow,
   tokenizeJson,
 } from "./schema.js";
 import { toolForm } from "./form.js";
@@ -147,6 +148,32 @@ const SetText = (state, { path, value }) => patchControl(state, path, value);
 const SetNumber = (state, { path, text: t, badInput }) => patchControl(state, path, { text: t, badInput });
 const SetToggle = (state, { path, checked }) => patchControl(state, path, checked);
 const SetSelect = (state, { path, value }) => patchControl(state, path, value);
+
+const AddRow = (state, path) => {
+  const form = state.form;
+  if (!form) return state;
+  const prop = arrayPropAt(form.schema, path);
+  if (!prop) return state;
+  const rows = form.controls[path] || [];
+  return patchControl(state, path, [...rows, newRow(prop.items)]);
+};
+
+const RemoveRow = (state, { path, id }) => {
+  const form = state.form;
+  if (!form) return state;
+  const rows = (form.controls[path] || []).filter((row) => row.id !== id);
+  return patchControl(state, path, rows);
+};
+
+// Resolve a dotted path to its (array) property schema.
+function arrayPropAt(schema, path) {
+  let prop = { type: "object", properties: schema.properties };
+  for (const name of path.split(".")) {
+    if (!prop.properties || !prop.properties[name]) return null;
+    prop = prop.properties[name];
+  }
+  return prop.type === "array" ? prop : null;
+}
 
 const RunRequested = (state) =>
   state.form && state.selected && !state.running ? [state, captureNumberValidityFx] : state;
@@ -534,7 +561,7 @@ const resultCard = ({ res }) => {
   ]);
 };
 
-const formHandlers = { SetText, SetNumber, SetToggle, SetSelect, SetJsonText };
+const formHandlers = { SetText, SetNumber, SetToggle, SetSelect, AddRow, RemoveRow, SetJsonText };
 
 const toolPanel = ({ selected, form, running, results }) =>
   h(
