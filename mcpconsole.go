@@ -15,6 +15,21 @@ import (
 //go:embed assets
 var assetsFS embed.FS
 
+type config struct {
+	title string
+}
+
+// Option customizes the console handler.
+type Option func(*config)
+
+// WithTitle sets the console title shown in the page <title> and the left rail.
+// The default is "MCP Console".
+func WithTitle(title string) Option {
+	return func(c *config) {
+		c.title = title
+	}
+}
+
 var contentTypes = map[string]string{
 	".html": "text/html; charset=utf-8",
 	".css":  "text/css; charset=utf-8",
@@ -26,7 +41,12 @@ const defaultTitle = "MCP Console"
 
 // Handler returns an http.Handler serving the console UI generated based
 // on the provided MCP endpoint (e.g. "/mcp").
-func Handler(mcpEndpoint string) http.Handler {
+func Handler(mcpEndpoint string, opts ...Option) http.Handler {
+	cfg := config{title: defaultTitle}
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+
 	files := map[string][]byte{}
 	entries, err := assetsFS.ReadDir("assets")
 	if err != nil {
@@ -48,13 +68,13 @@ func Handler(mcpEndpoint string) http.Handler {
 	// break out of its <script type="application/json"> block.
 	configJSON, err := json.Marshal(map[string]string{
 		"endpoint": mcpEndpoint,
-		"title":    defaultTitle,
+		"title":    cfg.title,
 	})
 	if err != nil {
 		panic(fmt.Sprintf("mcpconsole: marshaling config: %v", err))
 	}
 	indexPage := []byte(strings.NewReplacer(
-		"__MCPCONSOLE_TITLE__", html.EscapeString(defaultTitle),
+		"__MCPCONSOLE_TITLE__", html.EscapeString(cfg.title),
 		"__MCPCONSOLE_CONFIG__", string(configJSON),
 	).Replace(string(files["index.html"])))
 	delete(files, "index.html")

@@ -99,7 +99,7 @@ func NewMux() *http.ServeMux {
 		func(*http.Request) *mcp.Server { return server },
 		&mcp.StreamableHTTPOptions{JSONResponse: true},
 	))
-	mux.Handle("/ui/", mcpconsole.Handler("/mcp"))
+	mux.Handle("/ui/", mcpconsole.Handler("/mcp", mcpconsole.WithTitle("Echo - MCP Console")))
 	return mux
 }
 

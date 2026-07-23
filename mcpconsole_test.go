@@ -64,13 +64,29 @@ func TestConfigInjection(t *testing.T) {
 	if !strings.Contains(html, "<title>MCP Console</title>") {
 		t.Error("page <title> not set to default title")
 	}
+
+	rec = get(t, mcpconsole.Handler("/api/mcp", mcpconsole.WithTitle("Adder Dev UI")), "/ui/", "/ui/")
+	html = body(t, rec)
+	if !strings.Contains(html, `"endpoint":"/api/mcp"`) {
+		t.Error("config JSON lacks custom endpoint")
+	}
+	if !strings.Contains(html, `"title":"Adder Dev UI"`) {
+		t.Error("config JSON lacks custom title")
+	}
+	if !strings.Contains(html, "<title>Adder Dev UI</title>") {
+		t.Error("page <title> not set to custom title")
+	}
 }
 
 func TestConfigEscaping(t *testing.T) {
-	h := mcpconsole.Handler("</script><script>alert(1)</script>")
+	h := mcpconsole.Handler("</script><script>alert(1)</script>",
+		mcpconsole.WithTitle("</title><script>alert(2)</script>"))
 	html := body(t, get(t, h, "/ui/", "/ui/"))
 	if strings.Contains(html, "<script>alert(") {
 		t.Error("unescaped script breakout in served HTML")
+	}
+	if strings.Contains(html, "</title><script>") {
+		t.Error("unescaped title breakout in served HTML")
 	}
 }
 

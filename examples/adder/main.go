@@ -1,8 +1,5 @@
 // Command adder runs the example MCP server (one "add" tool) with the
 // mcpconsole UI mounted next to it:
-//
-//	go run ./adder
-//	open http://localhost:8080/ui/
 package main
 
 import (
@@ -40,7 +37,7 @@ func NewMux() *http.ServeMux {
 	server := NewServer()
 	mux := http.NewServeMux()
 	mux.Handle("/mcp", mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return server }, nil))
-	mux.Handle("/ui/", mcpconsole.Handler("/mcp"))
+	mux.Handle("/ui/", mcpconsole.Handler("/mcp", mcpconsole.WithTitle("Adder - MCP Console")))
 	return mux
 }
 
