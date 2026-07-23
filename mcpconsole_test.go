@@ -90,6 +90,32 @@ func TestConfigEscaping(t *testing.T) {
 	}
 }
 
+func TestServesAssetsUnderAnyPrefix(t *testing.T) {
+	h := mcpconsole.Handler("/mcp")
+	for _, tc := range []struct{ name, wantType string }{
+		{"app.css", "text/css"},
+		{"mcp.js", "text/javascript"},
+		{"schema.js", "text/javascript"},
+		{"form.js", "text/javascript"},
+		{"app.js", "text/javascript"},
+		{"hyperapp.js", "text/javascript"},
+	} {
+		for _, prefix := range []string{"/ui/", "/console/x/"} {
+			rec := get(t, h, prefix, prefix+tc.name)
+			if rec.Code != http.StatusOK {
+				t.Errorf("GET %s%s: status %d, want 200", prefix, tc.name, rec.Code)
+				continue
+			}
+			if ct := rec.Header().Get("Content-Type"); !strings.HasPrefix(ct, tc.wantType) {
+				t.Errorf("GET %s%s: Content-Type %q, want %s", prefix, tc.name, ct, tc.wantType)
+			}
+			if len(body(t, rec)) == 0 {
+				t.Errorf("GET %s%s: empty body", prefix, tc.name)
+			}
+		}
+	}
+}
+
 func TestUnknownAssetWithExtensionIs404(t *testing.T) {
 	rec := get(t, mcpconsole.Handler("/mcp"), "/ui/", "/ui/nope.png")
 	if rec.Code != http.StatusNotFound {
