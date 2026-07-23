@@ -1,0 +1,46 @@
+name: test
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          # The root module has no dependencies; the examples module owns the
+          # only go.sum in the repo.
+          cache-dependency-path: examples/go.sum
+
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "gofmt needed on:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Library tests
+        run: |
+          go vet ./...
+          go test ./...
+
+      - name: Example tests
+        working-directory: examples
+        run: |
+          go vet ./...
+          go vet -tags e2e ./...
+          go test ./...
+
+      - name: Browser end-to-end tests
+        working-directory: examples
+        run: go test -tags e2e ./adder
