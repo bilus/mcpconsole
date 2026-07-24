@@ -183,8 +183,23 @@ export function newRow(itemsSchema, value) {
   };
 }
 
-// initialControls builds the control map for a renderable object schema,
-// honoring schema defaults.
+// Write a control value into the map, routing "<array>.<rowId>" paths to the
+// matching row control inside the array entry.
+export function setControl(controls, path, control) {
+  if (path in controls) return { ...controls, [path]: control };
+  const i = path.lastIndexOf(".");
+  if (i >= 0) {
+    const parent = path.slice(0, i);
+    const id = Number(path.slice(i + 1));
+    const rows = controls[parent];
+    if (Array.isArray(rows) && rows.some((row) => row.id === id)) {
+      return { ...controls, [parent]: rows.map((row) => (row.id === id ? { ...row, control } : row)) };
+    }
+  }
+  return { ...controls, [path]: control };
+}
+
+// Initial control map for a renderable object schema, honoring schema defaults.
 export function initialControls(schema, base = "", out = {}) {
   const requiredList = Array.isArray(schema.required) ? schema.required : [];
   for (const [name, prop] of Object.entries(schema.properties || {})) {

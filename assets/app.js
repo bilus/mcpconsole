@@ -9,6 +9,7 @@ import {
   isSchemaObject,
   jsonSeed,
   newRow,
+  setControl,
   tokenizeJson,
 } from "./schema.js";
 import { toolForm } from "./form.js";
@@ -141,7 +142,7 @@ const SetJsonText = (state, jsonText) =>
 
 const patchControl = (state, path, control) =>
   state.form
-    ? { ...state, form: { ...state.form, controls: { ...state.form.controls, [path]: control } } }
+    ? { ...state, form: { ...state.form, controls: setControl(state.form.controls, path, control) } }
     : state;
 
 const SetText = (state, { path, value }) => patchControl(state, path, value);
@@ -178,26 +179,10 @@ function arrayPropAt(schema, path) {
 const RunRequested = (state) =>
   state.form && state.selected && !state.running ? [state, captureNumberValidityFx] : state;
 
-// mergeNumberCapture routes a captured {path, text, badInput} to its control:
-// either a direct entry, or a row control inside an array (path "<array>.<id>").
-function mergeNumberCapture(controls, { path, text: t, badInput }) {
-  if (path in controls) return { ...controls, [path]: { text: t, badInput } };
-  const i = path.lastIndexOf(".");
-  if (i < 0) return controls;
-  const parent = path.slice(0, i);
-  const id = Number(path.slice(i + 1));
-  const rows = controls[parent];
-  if (!Array.isArray(rows)) return controls;
-  return {
-    ...controls,
-    [parent]: rows.map((row) => (row.id === id ? { ...row, control: { text: t, badInput } } : row)),
-  };
-}
-
 const RunWithCapturedValidity = (state, captured) => {
   if (!state.form) return state;
   let controls = state.form.controls;
-  for (const c of captured) controls = mergeNumberCapture(controls, c);
+  for (const c of captured) controls = setControl(controls, c.path, { text: c.text, badInput: c.badInput });
   return Run({ ...state, form: { ...state.form, controls } });
 };
 
