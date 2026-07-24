@@ -13,7 +13,7 @@ function controlId(path) {
 function fieldShell({ path, extraClass, invalid, desc, error, children }) {
   return h(
     "div",
-    { key: path, class: ["field", extraClass, { invalid: Boolean(invalid) }] },
+    { key: path, "data-path": path, class: ["field", extraClass, { invalid: Boolean(invalid) }] },
     [
       ...children,
       desc ? h("div", { class: "field-desc" }, text(desc)) : false,
