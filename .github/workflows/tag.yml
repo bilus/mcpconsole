@@ -1,0 +1,38 @@
+name: tag
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read latest changelog entry
+        id: changelog
+        uses: mindsers/changelog-reader-action@v2
+        with:
+          validation_level: warn
+
+      - name: Tag the release
+        if: steps.changelog.outputs.status == 'released'
+        env:
+          VERSION: ${{ steps.changelog.outputs.version }}
+          CHANGES: ${{ steps.changelog.outputs.changes }}
+        run: |
+          tag="v$VERSION"
+          if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            echo "$tag already exists, nothing to do"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$tag" -m "mcpconsole $VERSION" -m "$CHANGES"
+          git push origin "$tag"
