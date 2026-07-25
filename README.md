@@ -16,6 +16,13 @@ JSON input schema.
 The library has no Go dependencies apart from the standard library. All frontend
 assets are embedded.
 
+The frontend uses (vendored)
+[hyperapp.js](https://github.com/jorgebucaran/hyperapp).
+
+> NOTE: I'm using the library and testing it against
+> [github.com/modelcontextprotocol/go-sdk](https://github.com/modelcontextprotocol/go-sdk).
+> It would be interesting to see how well it works with other libraries.
+
 ![Example](./docs/ss.jpeg)
 
 ## Usage
@@ -34,6 +41,8 @@ func main() {
 	log.Fatal(http.ListenAndServe("localhost:8080", mux))
 }
 ```
+
+For more examples see: [examples/README.md](examples/README.md).
 
 ### Options
 
