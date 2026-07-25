@@ -6,7 +6,7 @@ Echoes back the input:
 
 ``` sh
 go run ./echo
-open http://localhost:8080/ui/
+open http://localhost:8081/ui/
 ```
 
 ## Adder
@@ -24,5 +24,5 @@ Contains about every widget supported by the library:
 
 ``` sh
 go run ./storybook
-open http://localhost:8080/ui/
+open http://localhost:8082/ui/
 ```
