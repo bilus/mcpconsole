@@ -1,5 +1,7 @@
 # mcpconsole
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/bilus/mcpconsole.svg)](https://pkg.go.dev/github.com/bilus/mcpconsole)
+
 An embeddable, schema-driven web console for
 [MCP](https://modelcontextprotocol.io) servers, in one line of Go:
 
